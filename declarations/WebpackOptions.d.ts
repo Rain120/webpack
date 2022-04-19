@@ -56,14 +56,14 @@ export type EntryStatic = EntryObject | EntryUnnamed;
  */
 export type EntryItem = string[] | string;
 /**
- * The method of loading chunks (methods included by default are 'jsonp' (web), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
+ * The method of loading chunks (methods included by default are 'jsonp' (web), 'import' (ESM), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
  */
 export type ChunkLoading = false | ChunkLoadingType;
 /**
- * The method of loading chunks (methods included by default are 'jsonp' (web), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
+ * The method of loading chunks (methods included by default are 'jsonp' (web), 'import' (ESM), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
  */
 export type ChunkLoadingType =
-	| ("jsonp" | "import-scripts" | "require" | "async-node")
+	| ("jsonp" | "import-scripts" | "require" | "async-node" | "import")
 	| string;
 /**
  * Specifies the filename of the output file on disk. You must **not** specify an absolute path here, but the path may contain folders separated by '/'! The specified path is joined with the value of the 'output.path' option to determine the location on disk.
@@ -95,7 +95,7 @@ export type LibraryExport = string[] | string;
  */
 export type LibraryName = string[] | string | LibraryCustomUmdObject;
 /**
- * Type of library (types included by default are 'var', 'module', 'assign', 'assign-properties', 'this', 'window', 'self', 'global', 'commonjs', 'commonjs2', 'commonjs-module', 'amd', 'amd-require', 'umd', 'umd2', 'jsonp', 'system', but others might be added by plugins).
+ * Type of library (types included by default are 'var', 'module', 'assign', 'assign-properties', 'this', 'window', 'self', 'global', 'commonjs', 'commonjs2', 'commonjs-module', 'commonjs-static', 'amd', 'amd-require', 'umd', 'umd2', 'jsonp', 'system', but others might be added by plugins).
  */
 export type LibraryType =
 	| (
@@ -110,6 +110,7 @@ export type LibraryType =
 			| "commonjs"
 			| "commonjs2"
 			| "commonjs-module"
+			| "commonjs-static"
 			| "amd"
 			| "amd-require"
 			| "umd"
@@ -123,9 +124,22 @@ export type LibraryType =
  */
 export type UmdNamedDefine = boolean;
 /**
+ * The 'publicPath' specifies the public URL address of the output files when referenced in a browser.
+ */
+export type PublicPath = "auto" | RawPublicPath;
+/**
+ * The 'publicPath' specifies the public URL address of the output files when referenced in a browser.
+ */
+export type RawPublicPath =
+	| string
+	| ((
+			pathData: import("../lib/Compilation").PathData,
+			assetInfo?: import("../lib/Compilation").AssetInfo
+	  ) => string);
+/**
  * The name of the runtime chunk. If set a runtime chunk with this name is created or an existing entrypoint is used as runtime.
  */
-export type EntryRuntime = string;
+export type EntryRuntime = false | string;
 /**
  * The method of loading WebAssembly Modules (methods included by default are 'fetch' (web/WebWorker), 'async-node' (node.js), but others might be added by plugins).
  */
@@ -140,6 +154,10 @@ export type WasmLoadingType =
  * An entry point without name.
  */
 export type EntryUnnamed = EntryItem;
+/**
+ * Enables/Disables experiments (experimental features with relax SemVer compatibility).
+ */
+export type Experiments = ExperimentsCommon & ExperimentsExtra;
 /**
  * Specify dependencies that shouldn't be resolved by webpack, but should become dependencies of the resulting bundle. The kind of the dependency depends on `output.libraryTarget`.
  */
@@ -172,6 +190,7 @@ export type ExternalsType =
 	| "commonjs"
 	| "commonjs2"
 	| "commonjs-module"
+	| "commonjs-static"
 	| "amd"
 	| "amd-require"
 	| "umd"
@@ -180,7 +199,8 @@ export type ExternalsType =
 	| "system"
 	| "promise"
 	| "import"
-	| "script";
+	| "script"
+	| "node-commonjs";
 /**
  * Ignore specific warnings.
  */
@@ -227,21 +247,8 @@ export type RuleSetConditionOrConditions = RuleSetCondition | RuleSetConditions;
 export type RuleSetCondition =
 	| RegExp
 	| string
-	| {
-			/**
-			 * Logical AND.
-			 */
-			and?: RuleSetConditions;
-			/**
-			 * Logical NOT.
-			 */
-			not?: RuleSetConditions;
-			/**
-			 * Logical OR.
-			 */
-			or?: RuleSetConditions;
-	  }
 	| ((value: string) => boolean)
+	| RuleSetLogicalConditions
 	| RuleSetConditions;
 /**
  * A list of rule conditions.
@@ -259,21 +266,8 @@ export type RuleSetConditionOrConditionsAbsolute =
 export type RuleSetConditionAbsolute =
 	| RegExp
 	| string
-	| {
-			/**
-			 * Logical AND.
-			 */
-			and?: RuleSetConditionsAbsolute;
-			/**
-			 * Logical NOT.
-			 */
-			not?: RuleSetConditionsAbsolute;
-			/**
-			 * Logical OR.
-			 */
-			or?: RuleSetConditionsAbsolute;
-	  }
 	| ((value: string) => boolean)
+	| RuleSetLogicalConditionsAbsolute
 	| RuleSetConditionsAbsolute;
 /**
  * A list of rule conditions matching an absolute path.
@@ -426,9 +420,11 @@ export type Charset = boolean;
  */
 export type ChunkFilename = FilenameTemplate;
 /**
- * The format of chunks (formats included by default are 'array-push' (web/WebWorker), 'commonjs' (node.js), but others might be added by plugins).
+ * The format of chunks (formats included by default are 'array-push' (web/WebWorker), 'commonjs' (node.js), 'module' (ESM), but others might be added by plugins).
  */
-export type ChunkFormat = ("array-push" | "commonjs" | false) | string;
+export type ChunkFormat =
+	| ("array-push" | "commonjs" | "module" | false)
+	| string;
 /**
  * Number of milliseconds before chunk request expires.
  */
@@ -449,6 +445,14 @@ export type CompareBeforeEmit = boolean;
  * This option enables cross-origin loading of chunks.
  */
 export type CrossOriginLoading = false | "anonymous" | "use-credentials";
+/**
+ * Specifies the filename template of non-initial output css files on disk. You must **not** specify an absolute path here, but the path may contain folders separated by '/'! The specified path is joined with the value of the 'output.path' option to determine the location on disk.
+ */
+export type CssChunkFilename = FilenameTemplate;
+/**
+ * Specifies the filename template of output css files on disk. You must **not** specify an absolute path here, but the path may contain folders separated by '/'! The specified path is joined with the value of the 'output.path' option to determine the location on disk.
+ */
+export type CssFilename = FilenameTemplate;
 /**
  * Similar to `output.devtoolModuleFilenameTemplate`, but used in the case of duplicate module identifiers.
  */
@@ -537,16 +541,6 @@ export type Path = string;
  * Include comments with information about the modules.
  */
 export type Pathinfo = "verbose" | boolean;
-/**
- * The `publicPath` specifies the public URL address of the output files when referenced in a browser.
- */
-export type PublicPath =
-	| "auto"
-	| string
-	| ((
-			pathData: import("../lib/Compilation").PathData,
-			assetInfo?: import("../lib/Compilation").AssetInfo
-	  ) => string);
 /**
  * This option enables loading async chunks via a custom script type, such as script type="module".
  */
@@ -687,7 +681,7 @@ export type AssetGeneratorDataUrl =
 	| AssetGeneratorDataUrlOptions
 	| AssetGeneratorDataUrlFunction;
 /**
- * Function that executes for module and should return an DataUrl string.
+ * Function that executes for module and should return an DataUrl string. It can have a string as 'ident' property which contributes to the module hash.
  */
 export type AssetGeneratorDataUrlFunction = (
 	source: string | Buffer,
@@ -698,6 +692,15 @@ export type AssetGeneratorDataUrlFunction = (
  */
 export type AssetGeneratorOptions = AssetInlineGeneratorOptions &
 	AssetResourceGeneratorOptions;
+/**
+ * Emit the asset in the specified folder relative to 'output.path'. This should only be needed when custom 'publicPath' is specified to match the folder structure there.
+ */
+export type AssetModuleOutputPath =
+	| string
+	| ((
+			pathData: import("../lib/Compilation").PathData,
+			assetInfo?: import("../lib/Compilation").AssetInfo
+	  ) => string);
 /**
  * Function that executes for module and should return whenever asset should be inlined as DataUrl.
  */
@@ -714,6 +717,11 @@ export type EntryDynamicNormalized = () => Promise<EntryStaticNormalized>;
  */
 export type EntryNormalized = EntryDynamicNormalized | EntryStaticNormalized;
 /**
+ * Enables/Disables experiments (experimental features with relax SemVer compatibility).
+ */
+export type ExperimentsNormalized = ExperimentsCommon &
+	ExperimentsNormalizedExtra;
+/**
  * The dependency used for the external.
  */
 export type ExternalItemValue =
@@ -723,6 +731,18 @@ export type ExternalItemValue =
 	| {
 			[k: string]: any;
 	  };
+/**
+ * List of allowed URIs for building http resources.
+ */
+export type HttpUriAllowedUris = HttpUriOptionsAllowedUris;
+/**
+ * List of allowed URIs (resp. the beginning of them).
+ */
+export type HttpUriOptionsAllowedUris = (
+	| RegExp
+	| string
+	| ((uri: string) => boolean)
+)[];
 /**
  * Ignore specific warnings.
  */
@@ -901,6 +921,14 @@ export interface WebpackOptions {
  */
 export interface MemoryCacheOptions {
 	/**
+	 * Additionally cache computation of modules that are unchanged and reference only unchanged modules.
+	 */
+	cacheUnaffected?: boolean;
+	/**
+	 * Number of generations unused cache entries stay in memory cache at minimum (1 = may be removed after unused for a single compilation, ..., Infinity: kept forever).
+	 */
+	maxGenerations?: number;
+	/**
 	 * In memory caching.
 	 */
 	type: "memory";
@@ -909,6 +937,10 @@ export interface MemoryCacheOptions {
  * Options object for persistent file-based caching.
  */
 export interface FileCacheOptions {
+	/**
+	 * Allows to collect unused memory allocated during deserialization. This requires copying data into smaller buffers and has a performance cost.
+	 */
+	allowCollectingMemory?: boolean;
 	/**
 	 * Dependencies the build depends on (in multiple categories, default categories: 'defaultWebpack').
 	 */
@@ -927,29 +959,53 @@ export interface FileCacheOptions {
 	 */
 	cacheLocation?: string;
 	/**
+	 * Compression type used for the cache files.
+	 */
+	compression?: false | "gzip" | "brotli";
+	/**
 	 * Algorithm used for generation the hash (see node.js crypto package).
 	 */
 	hashAlgorithm?: string;
 	/**
-	 * Time in ms after which idle period the cache storing should happen (only for store: 'pack' or 'idle').
+	 * Time in ms after which idle period the cache storing should happen.
 	 */
 	idleTimeout?: number;
 	/**
-	 * Time in ms after which idle period the initial cache storing should happen (only for store: 'pack' or 'idle').
+	 * Time in ms after which idle period the cache storing should happen when larger changes has been detected (cumulative build time > 2 x avg cache store time).
+	 */
+	idleTimeoutAfterLargeChanges?: number;
+	/**
+	 * Time in ms after which idle period the initial cache storing should happen.
 	 */
 	idleTimeoutForInitialStore?: number;
 	/**
 	 * List of paths that are managed by a package manager and contain a version or hash in its path so all files are immutable.
 	 */
-	immutablePaths?: string[];
+	immutablePaths?: (RegExp | string)[];
 	/**
 	 * List of paths that are managed by a package manager and can be trusted to not be modified otherwise.
 	 */
-	managedPaths?: string[];
+	managedPaths?: (RegExp | string)[];
+	/**
+	 * Time for which unused cache entries stay in the filesystem cache at minimum (in milliseconds).
+	 */
+	maxAge?: number;
+	/**
+	 * Number of generations unused cache entries stay in memory cache at minimum (0 = no memory cache used, 1 = may be removed after unused for a single compilation, ..., Infinity: kept forever). Cache entries will be deserialized from disk when removed from memory cache.
+	 */
+	maxMemoryGenerations?: number;
+	/**
+	 * Additionally cache computation of modules that are unchanged and reference only unchanged modules in memory.
+	 */
+	memoryCacheUnaffected?: boolean;
 	/**
 	 * Name for the cache. Different names will lead to different coexisting caches.
 	 */
 	name?: string;
+	/**
+	 * Track and log detailed timing information for individual cache items.
+	 */
+	profile?: boolean;
 	/**
 	 * When to store data to the filesystem. (pack: Store data when compiler is idle in a single file).
 	 */
@@ -983,7 +1039,15 @@ export interface EntryObject {
  */
 export interface EntryDescription {
 	/**
-	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
+	 * Enable/disable creating async chunks that are loaded on demand.
+	 */
+	asyncChunks?: boolean;
+	/**
+	 * Base uri for this entry.
+	 */
+	baseUri?: string;
+	/**
+	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'import' (ESM), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
 	 */
 	chunkLoading?: ChunkLoading;
 	/**
@@ -1006,6 +1070,10 @@ export interface EntryDescription {
 	 * Options for library.
 	 */
 	library?: LibraryOptions;
+	/**
+	 * The 'publicPath' specifies the public URL address of the output files when referenced in a browser.
+	 */
+	publicPath?: PublicPath;
 	/**
 	 * The name of the runtime chunk. If set a runtime chunk with this name is created or an existing entrypoint is used as runtime.
 	 */
@@ -1032,7 +1100,7 @@ export interface LibraryOptions {
 	 */
 	name?: LibraryName;
 	/**
-	 * Type of library (types included by default are 'var', 'module', 'assign', 'assign-properties', 'this', 'window', 'self', 'global', 'commonjs', 'commonjs2', 'commonjs-module', 'amd', 'amd-require', 'umd', 'umd2', 'jsonp', 'system', but others might be added by plugins).
+	 * Type of library (types included by default are 'var', 'module', 'assign', 'assign-properties', 'this', 'window', 'self', 'global', 'commonjs', 'commonjs2', 'commonjs-module', 'commonjs-static', 'amd', 'amd-require', 'umd', 'umd2', 'jsonp', 'system', but others might be added by plugins).
 	 */
 	type: LibraryType;
 	/**
@@ -1079,71 +1147,6 @@ export interface LibraryCustomUmdObject {
 	root?: string[] | string;
 }
 /**
- * Enables/Disables experiments (experimental features with relax SemVer compatibility).
- */
-export interface Experiments {
-	/**
-	 * Allow module type 'asset' to generate assets.
-	 */
-	asset?: boolean;
-	/**
-	 * Support WebAssembly as asynchronous EcmaScript Module.
-	 */
-	asyncWebAssembly?: boolean;
-	/**
-	 * Enable module and chunk layers.
-	 */
-	layers?: boolean;
-	/**
-	 * Compile entrypoints and import()s only when they are accessed.
-	 */
-	lazyCompilation?:
-		| boolean
-		| {
-				/**
-				 * A custom backend.
-				 */
-				backend?:
-					| ((
-							compiler: import("../lib/Compiler"),
-							client: string,
-							callback: (err?: Error, api?: any) => void
-					  ) => void)
-					| ((
-							compiler: import("../lib/Compiler"),
-							client: string
-					  ) => Promise<any>);
-				/**
-				 * A custom client.
-				 */
-				client?: string;
-				/**
-				 * Enable/disable lazy compilation for entries.
-				 */
-				entries?: boolean;
-				/**
-				 * Enable/disable lazy compilation for import() modules.
-				 */
-				imports?: boolean;
-				/**
-				 * Specify which entrypoints or import()ed modules should be lazily compiled. This is matched with the imported module and not the entrypoint name.
-				 */
-				test?: RegExp | string | ((module: import("../lib/Module")) => boolean);
-		  };
-	/**
-	 * Allow output javascript files as module source type.
-	 */
-	outputModule?: boolean;
-	/**
-	 * Support WebAssembly as synchronous EcmaScript Module (outdated).
-	 */
-	syncWebAssembly?: boolean;
-	/**
-	 * Allow using top-level-await in EcmaScript Modules.
-	 */
-	topLevelAwait?: boolean;
-}
-/**
  * Enable presets of externals for specific targets.
  */
 export interface ExternalsPresets {
@@ -1185,6 +1188,18 @@ export interface ExternalsPresets {
  */
 export interface InfrastructureLogging {
 	/**
+	 * Only appends lines to the output. Avoids updating existing output e. g. for status messages. This option is only used when no custom console is provided.
+	 */
+	appendOnly?: boolean;
+	/**
+	 * Enables/Disables colorful output. This option is only used when no custom console is provided.
+	 */
+	colors?: boolean;
+	/**
+	 * Custom console used for logging.
+	 */
+	console?: Console;
+	/**
 	 * Enable debug logging for specific loggers.
 	 */
 	debug?: boolean | FilterTypes;
@@ -1192,6 +1207,10 @@ export interface InfrastructureLogging {
 	 * Log level.
 	 */
 	level?: "none" | "error" | "warn" | "info" | "log" | "verbose";
+	/**
+	 * Stream used for logging output. Defaults to process.stderr. This option is only used when no custom console is provided.
+	 */
+	stream?: NodeJS.WritableStream;
 }
 /**
  * Custom values available in the loader context.
@@ -1285,6 +1304,12 @@ export interface ModuleOptions {
  */
 export interface RuleSetRule {
 	/**
+	 * Match on import assertions of the dependency.
+	 */
+	assert?: {
+		[k: string]: RuleSetConditionOrConditions;
+	};
+	/**
 	 * Match the child compiler name.
 	 */
 	compiler?: RuleSetConditionOrConditions;
@@ -1375,6 +1400,10 @@ export interface RuleSetRule {
 	 */
 	rules?: RuleSetRule[];
 	/**
+	 * Match module scheme.
+	 */
+	scheme?: RuleSetConditionOrConditions;
+	/**
 	 * Flags a module as with or without side effects.
 	 */
 	sideEffects?: boolean;
@@ -1390,6 +1419,40 @@ export interface RuleSetRule {
 	 * Modifiers applied to the module when rule is matched.
 	 */
 	use?: RuleSetUse;
+}
+/**
+ * Logic operators used in a condition matcher.
+ */
+export interface RuleSetLogicalConditions {
+	/**
+	 * Logical AND.
+	 */
+	and?: RuleSetConditions;
+	/**
+	 * Logical NOT.
+	 */
+	not?: RuleSetCondition;
+	/**
+	 * Logical OR.
+	 */
+	or?: RuleSetConditions;
+}
+/**
+ * Logic operators used in a condition matcher.
+ */
+export interface RuleSetLogicalConditionsAbsolute {
+	/**
+	 * Logical AND.
+	 */
+	and?: RuleSetConditionsAbsolute;
+	/**
+	 * Logical NOT.
+	 */
+	not?: RuleSetConditionAbsolute;
+	/**
+	 * Logical OR.
+	 */
+	or?: RuleSetConditionsAbsolute;
 }
 /**
  * Options object for resolving requests.
@@ -1532,15 +1595,15 @@ export interface NodeOptions {
 	/**
 	 * Include a polyfill for the '__dirname' variable.
 	 */
-	__dirname?: false | true | "mock" | "eval-only";
+	__dirname?: false | true | "warn-mock" | "mock" | "eval-only";
 	/**
 	 * Include a polyfill for the '__filename' variable.
 	 */
-	__filename?: false | true | "mock" | "eval-only";
+	__filename?: false | true | "warn-mock" | "mock" | "eval-only";
 	/**
 	 * Include a polyfill for the 'global' variable.
 	 */
-	global?: boolean;
+	global?: false | true | "warn";
 }
 /**
  * Enables/Disables integrated optimizations.
@@ -1700,6 +1763,12 @@ export interface OptimizationSplitChunksOptions {
 		 */
 		automaticNameDelimiter?: string;
 		/**
+		 * Select chunks for determining shared modules (defaults to "async", "initial" and "all" requires adding these chunks to the HTML).
+		 */
+		chunks?:
+			| ("initial" | "async" | "all")
+			| ((chunk: import("../lib/Chunk")) => boolean);
+		/**
 		 * Maximal size hint for the on-demand chunks.
 		 */
 		maxAsyncSize?: OptimizationSplitChunksSizes;
@@ -1715,6 +1784,10 @@ export interface OptimizationSplitChunksOptions {
 		 * Minimal size for the created chunk.
 		 */
 		minSize?: OptimizationSplitChunksSizes;
+		/**
+		 * Minimum size reduction due to the created chunk.
+		 */
+		minSizeReduction?: OptimizationSplitChunksSizes;
 	};
 	/**
 	 * Sets the template for the filename for created chunks.
@@ -1761,6 +1834,10 @@ export interface OptimizationSplitChunksOptions {
 	 * Minimal size for the created chunks.
 	 */
 	minSize?: OptimizationSplitChunksSizes;
+	/**
+	 * Minimum size reduction due to the created chunk.
+	 */
+	minSizeReduction?: OptimizationSplitChunksSizes;
 	/**
 	 * Give chunks created a name (chunks with equal name are merged).
 	 */
@@ -1842,6 +1919,10 @@ export interface OptimizationSplitChunksCacheGroup {
 	 */
 	minSize?: OptimizationSplitChunksSizes;
 	/**
+	 * Minimum size reduction due to the created chunk.
+	 */
+	minSizeReduction?: OptimizationSplitChunksSizes;
+	/**
 	 * Give chunks for this cache group a name (chunks with equal name are merged).
 	 */
 	name?: false | string | Function;
@@ -1875,6 +1956,10 @@ export interface Output {
 	 */
 	assetModuleFilename?: AssetModuleFilename;
 	/**
+	 * Enable/disable creating async chunks that are loaded on demand.
+	 */
+	asyncChunks?: boolean;
+	/**
 	 * Add a comment in the UMD wrapper.
 	 */
 	auxiliaryComment?: AuxiliaryComment;
@@ -1887,7 +1972,7 @@ export interface Output {
 	 */
 	chunkFilename?: ChunkFilename;
 	/**
-	 * The format of chunks (formats included by default are 'array-push' (web/WebWorker), 'commonjs' (node.js), but others might be added by plugins).
+	 * The format of chunks (formats included by default are 'array-push' (web/WebWorker), 'commonjs' (node.js), 'module' (ESM), but others might be added by plugins).
 	 */
 	chunkFormat?: ChunkFormat;
 	/**
@@ -1895,7 +1980,7 @@ export interface Output {
 	 */
 	chunkLoadTimeout?: ChunkLoadTimeout;
 	/**
-	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
+	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'import' (ESM), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
 	 */
 	chunkLoading?: ChunkLoading;
 	/**
@@ -1914,6 +1999,14 @@ export interface Output {
 	 * This option enables cross-origin loading of chunks.
 	 */
 	crossOriginLoading?: CrossOriginLoading;
+	/**
+	 * Specifies the filename template of non-initial output css files on disk. You must **not** specify an absolute path here, but the path may contain folders separated by '/'! The specified path is joined with the value of the 'output.path' option to determine the location on disk.
+	 */
+	cssChunkFilename?: CssChunkFilename;
+	/**
+	 * Specifies the filename template of output css files on disk. You must **not** specify an absolute path here, but the path may contain folders separated by '/'! The specified path is joined with the value of the 'output.path' option to determine the location on disk.
+	 */
+	cssFilename?: CssFilename;
 	/**
 	 * Similar to `output.devtoolModuleFilenameTemplate`, but used in the case of duplicate module identifiers.
 	 */
@@ -1999,7 +2092,7 @@ export interface Output {
 	 */
 	libraryExport?: LibraryExport;
 	/**
-	 * Type of library (types included by default are 'var', 'module', 'assign', 'assign-properties', 'this', 'window', 'self', 'global', 'commonjs', 'commonjs2', 'commonjs-module', 'amd', 'amd-require', 'umd', 'umd2', 'jsonp', 'system', but others might be added by plugins).
+	 * Type of library (types included by default are 'var', 'module', 'assign', 'assign-properties', 'this', 'window', 'self', 'global', 'commonjs', 'commonjs2', 'commonjs-module', 'commonjs-static', 'amd', 'amd-require', 'umd', 'umd2', 'jsonp', 'system', but others might be added by plugins).
 	 */
 	libraryTarget?: LibraryType;
 	/**
@@ -2015,7 +2108,7 @@ export interface Output {
 	 */
 	pathinfo?: Pathinfo;
 	/**
-	 * The `publicPath` specifies the public URL address of the output files when referenced in a browser.
+	 * The 'publicPath' specifies the public URL address of the output files when referenced in a browser.
 	 */
 	publicPath?: PublicPath;
 	/**
@@ -2039,6 +2132,10 @@ export interface Output {
 	 */
 	strictModuleExceptionHandling?: StrictModuleExceptionHandling;
 	/**
+	 * Use a Trusted Types policy to create urls for chunks. 'output.uniqueName' is used a default policy name. Passing a string sets a custom policy name.
+	 */
+	trustedTypes?: true | string | TrustedTypes;
+	/**
 	 * If `output.libraryTarget` is set to umd and `output.library` is set, setting this to true will name the AMD module.
 	 */
 	umdNamedDefine?: UmdNamedDefine;
@@ -2055,7 +2152,7 @@ export interface Output {
 	 */
 	webassemblyModuleFilename?: WebassemblyModuleFilename;
 	/**
-	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
+	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'import' (ESM), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
 	 */
 	workerChunkLoading?: ChunkLoading;
 	/**
@@ -2108,6 +2205,23 @@ export interface Environment {
 	 * The environment supports EcmaScript Module syntax to import EcmaScript modules (import ... from '...').
 	 */
 	module?: boolean;
+	/**
+	 * The environment supports optional chaining ('obj?.a' or 'obj?.()').
+	 */
+	optionalChaining?: boolean;
+	/**
+	 * The environment supports template literals.
+	 */
+	templateLiteral?: boolean;
+}
+/**
+ * Use a Trusted Types policy to create urls for chunks.
+ */
+export interface TrustedTypes {
+	/**
+	 * The name of the Trusted Types policy created by webpack to serve bundle chunks.
+	 */
+	policyName?: string;
 }
 /**
  * Configuration object for web performance recommendations.
@@ -2150,11 +2264,11 @@ export interface SnapshotOptions {
 	/**
 	 * List of paths that are managed by a package manager and contain a version or hash in its path so all files are immutable.
 	 */
-	immutablePaths?: string[];
+	immutablePaths?: (RegExp | string)[];
 	/**
 	 * List of paths that are managed by a package manager and can be trusted to not be modified otherwise.
 	 */
-	managedPaths?: string[];
+	managedPaths?: (RegExp | string)[];
 	/**
 	 * Options for snapshotting dependencies of modules to determine if they need to be built again.
 	 */
@@ -2395,6 +2509,14 @@ export interface StatsOptions {
 	 */
 	groupModulesByPath?: boolean;
 	/**
+	 * Group modules by their type.
+	 */
+	groupModulesByType?: boolean;
+	/**
+	 * Group reasons by their origin module.
+	 */
+	groupReasonsByOrigin?: boolean;
+	/**
 	 * Add the hash of the compilation.
 	 */
 	hash?: boolean;
@@ -2474,6 +2596,10 @@ export interface StatsOptions {
 	 * Add information about the reasons why modules are included.
 	 */
 	reasons?: boolean;
+	/**
+	 * Space to display reasons (groups will be collapsed to fit this space).
+	 */
+	reasonsSpace?: number;
 	/**
 	 * Add information about assets that are related to other assets (like SourceMaps for assets).
 	 */
@@ -2585,10 +2711,39 @@ export interface AssetParserOptions {
  */
 export interface AssetResourceGeneratorOptions {
 	/**
+	 * Emit an output asset from this asset module. This can be set to 'false' to omit emitting e. g. for SSR.
+	 */
+	emit?: boolean;
+	/**
 	 * Specifies the filename template of output files on disk. You must **not** specify an absolute path here, but the path may contain folders separated by '/'! The specified path is joined with the value of the 'output.path' option to determine the location on disk.
 	 */
 	filename?: FilenameTemplate;
+	/**
+	 * Emit the asset in the specified folder relative to 'output.path'. This should only be needed when custom 'publicPath' is specified to match the folder structure there.
+	 */
+	outputPath?: AssetModuleOutputPath;
+	/**
+	 * The 'publicPath' specifies the public URL address of the output files when referenced in a browser.
+	 */
+	publicPath?: RawPublicPath;
 }
+/**
+ * Options for css handling.
+ */
+export interface CssExperimentOptions {
+	/**
+	 * Avoid generating and loading a stylesheet and only embed exports from css into output javascript files.
+	 */
+	exportsOnly?: boolean;
+}
+/**
+ * Generator options for css modules.
+ */
+export interface CssGeneratorOptions {}
+/**
+ * Parser options for css modules.
+ */
+export interface CssParserOptions {}
 /**
  * No generator options are supported for this module type.
  */
@@ -2602,7 +2757,15 @@ export interface EmptyParserOptions {}
  */
 export interface EntryDescriptionNormalized {
 	/**
-	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
+	 * Enable/disable creating async chunks that are loaded on demand.
+	 */
+	asyncChunks?: boolean;
+	/**
+	 * Base uri for this entry.
+	 */
+	baseUri?: string;
+	/**
+	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'import' (ESM), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
 	 */
 	chunkLoading?: ChunkLoading;
 	/**
@@ -2626,6 +2789,10 @@ export interface EntryDescriptionNormalized {
 	 */
 	library?: LibraryOptions;
 	/**
+	 * The 'publicPath' specifies the public URL address of the output files when referenced in a browser.
+	 */
+	publicPath?: PublicPath;
+	/**
 	 * The name of the runtime chunk. If set a runtime chunk with this name is created or an existing entrypoint is used as runtime.
 	 */
 	runtime?: EntryRuntime;
@@ -2644,6 +2811,43 @@ export interface EntryStaticNormalized {
 	[k: string]: EntryDescriptionNormalized;
 }
 /**
+ * Enables/Disables experiments (experimental features with relax SemVer compatibility).
+ */
+export interface ExperimentsCommon {
+	/**
+	 * Support WebAssembly as asynchronous EcmaScript Module.
+	 */
+	asyncWebAssembly?: boolean;
+	/**
+	 * Enable backward-compat layer with deprecation warnings for many webpack 4 APIs.
+	 */
+	backCompat?: boolean;
+	/**
+	 * Enable additional in memory caching of modules that are unchanged and reference only unchanged modules.
+	 */
+	cacheUnaffected?: boolean;
+	/**
+	 * Apply defaults of next major version.
+	 */
+	futureDefaults?: boolean;
+	/**
+	 * Enable module layers.
+	 */
+	layers?: boolean;
+	/**
+	 * Allow output javascript files as module source type.
+	 */
+	outputModule?: boolean;
+	/**
+	 * Support WebAssembly as synchronous EcmaScript Module (outdated).
+	 */
+	syncWebAssembly?: boolean;
+	/**
+	 * Allow using top-level-await in EcmaScript Modules.
+	 */
+	topLevelAwait?: boolean;
+}
+/**
  * Data object passed as argument when a function is set for 'externals'.
  */
 export interface ExternalItemFunctionData {
@@ -2655,6 +2859,10 @@ export interface ExternalItemFunctionData {
 	 * Contextual information.
 	 */
 	contextInfo?: import("../lib/ModuleFactory").ModuleFactoryCreateDataContextInfo;
+	/**
+	 * The category of the referencing dependencies.
+	 */
+	dependencyType?: string;
 	/**
 	 * Get a resolve function with the current resolver options.
 	 */
@@ -2671,6 +2879,35 @@ export interface ExternalItemFunctionData {
 	 * The request as written by the user in the require/import expression/statement.
 	 */
 	request?: string;
+}
+/**
+ * Options for building http resources.
+ */
+export interface HttpUriOptions {
+	/**
+	 * List of allowed URIs (resp. the beginning of them).
+	 */
+	allowedUris: HttpUriOptionsAllowedUris;
+	/**
+	 * Location where resource content is stored for lockfile entries. It's also possible to disable storing by passing false.
+	 */
+	cacheLocation?: false | string;
+	/**
+	 * When set, anything that would lead to a modification of the lockfile or any resource content, will result in an error.
+	 */
+	frozen?: boolean;
+	/**
+	 * Location of the lockfile.
+	 */
+	lockfileLocation?: string;
+	/**
+	 * Proxy configuration, which can be used to specify a proxy server to use for HTTP requests.
+	 */
+	proxy?: string;
+	/**
+	 * When set, resources of existing lockfile entries will be fetched and entries will be upgraded when resource content has changed.
+	 */
+	upgrade?: boolean;
 }
 /**
  * Parser options for javascript modules.
@@ -2692,6 +2929,10 @@ export interface JavascriptParserOptions {
 	 * Enable/disable parsing of magic comments in CommonJs syntax.
 	 */
 	commonjsMagicComments?: boolean;
+	/**
+	 * Specifies the behavior of invalid export names in "import ... from ..." and "export ... from ...".
+	 */
+	exportsPresence?: "error" | "warn" | "auto" | false;
 	/**
 	 * Enable warnings for full dynamic dependencies.
 	 */
@@ -2717,9 +2958,25 @@ export interface JavascriptParserOptions {
 	 */
 	import?: boolean;
 	/**
+	 * Specifies the behavior of invalid export names in "import ... from ...".
+	 */
+	importExportsPresence?: "error" | "warn" | "auto" | false;
+	/**
+	 * Enable/disable evaluating import.meta.
+	 */
+	importMeta?: boolean;
+	/**
+	 * Enable/disable evaluating import.meta.webpackContext.
+	 */
+	importMetaContext?: boolean;
+	/**
 	 * Include polyfills or mocks for various node stuff.
 	 */
 	node?: Node;
+	/**
+	 * Specifies the behavior of invalid export names in "export ... from ...". This might be useful to disable during the migration from "export ... from ..." to "export type ... from ..." when reexporting types in TypeScript.
+	 */
+	reexportExportsPresence?: "error" | "warn" | "auto" | false;
 	/**
 	 * Enable/disable parsing of require.context syntax.
 	 */
@@ -2737,7 +2994,7 @@ export interface JavascriptParserOptions {
 	 */
 	requireJs?: boolean;
 	/**
-	 * Emit errors instead of warnings when imported names don't exist in imported module.
+	 * Deprecated in favor of "exportsPresence". Emit errors instead of warnings when imported names don't exist in imported module.
 	 */
 	strictExportPresence?: boolean;
 	/**
@@ -2787,6 +3044,66 @@ export interface JavascriptParserOptions {
 	[k: string]: any;
 }
 /**
+ * Options for the default backend.
+ */
+export interface LazyCompilationDefaultBackendOptions {
+	/**
+	 * A custom client.
+	 */
+	client?: string;
+	/**
+	 * Specifies where to listen to from the server.
+	 */
+	listen?:
+		| number
+		| import("net").ListenOptions
+		| ((server: import("net").Server) => void);
+	/**
+	 * Specifies the protocol the client should use to connect to the server.
+	 */
+	protocol?: "http" | "https";
+	/**
+	 * Specifies how to create the server handling the EventSource requests.
+	 */
+	server?:
+		| (import("https").ServerOptions | import("http").ServerOptions)
+		| (() => import("net").Server);
+}
+/**
+ * Options for compiling entrypoints and import()s only when they are accessed.
+ */
+export interface LazyCompilationOptions {
+	/**
+	 * Specifies the backend that should be used for handling client keep alive.
+	 */
+	backend?:
+		| (
+				| ((
+						compiler: import("../lib/Compiler"),
+						callback: (
+							err?: Error,
+							api?: import("../lib/hmr/LazyCompilationPlugin").BackendApi
+						) => void
+				  ) => void)
+				| ((
+						compiler: import("../lib/Compiler")
+				  ) => Promise<import("../lib/hmr/LazyCompilationPlugin").BackendApi>)
+		  )
+		| LazyCompilationDefaultBackendOptions;
+	/**
+	 * Enable/disable lazy compilation for entries.
+	 */
+	entries?: boolean;
+	/**
+	 * Enable/disable lazy compilation for import() modules.
+	 */
+	imports?: boolean;
+	/**
+	 * Specify which entrypoints or import()ed modules should be lazily compiled. This is matched with the imported module and not the entrypoint name.
+	 */
+	test?: RegExp | string | ((module: import("../lib/Module")) => boolean);
+}
+/**
  * Options affecting the normal modules (`NormalModuleFactory`).
  */
 export interface ModuleOptionsNormalized {
@@ -2824,6 +3141,10 @@ export interface OutputNormalized {
 	 */
 	assetModuleFilename?: AssetModuleFilename;
 	/**
+	 * Enable/disable creating async chunks that are loaded on demand.
+	 */
+	asyncChunks?: boolean;
+	/**
 	 * Add charset attribute for script tag.
 	 */
 	charset?: Charset;
@@ -2832,7 +3153,7 @@ export interface OutputNormalized {
 	 */
 	chunkFilename?: ChunkFilename;
 	/**
-	 * The format of chunks (formats included by default are 'array-push' (web/WebWorker), 'commonjs' (node.js), but others might be added by plugins).
+	 * The format of chunks (formats included by default are 'array-push' (web/WebWorker), 'commonjs' (node.js), 'module' (ESM), but others might be added by plugins).
 	 */
 	chunkFormat?: ChunkFormat;
 	/**
@@ -2840,7 +3161,7 @@ export interface OutputNormalized {
 	 */
 	chunkLoadTimeout?: ChunkLoadTimeout;
 	/**
-	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
+	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'import' (ESM), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
 	 */
 	chunkLoading?: ChunkLoading;
 	/**
@@ -2859,6 +3180,14 @@ export interface OutputNormalized {
 	 * This option enables cross-origin loading of chunks.
 	 */
 	crossOriginLoading?: CrossOriginLoading;
+	/**
+	 * Specifies the filename template of non-initial output css files on disk. You must **not** specify an absolute path here, but the path may contain folders separated by '/'! The specified path is joined with the value of the 'output.path' option to determine the location on disk.
+	 */
+	cssChunkFilename?: CssChunkFilename;
+	/**
+	 * Specifies the filename template of output css files on disk. You must **not** specify an absolute path here, but the path may contain folders separated by '/'! The specified path is joined with the value of the 'output.path' option to determine the location on disk.
+	 */
+	cssFilename?: CssFilename;
 	/**
 	 * Similar to `output.devtoolModuleFilenameTemplate`, but used in the case of duplicate module identifiers.
 	 */
@@ -2952,7 +3281,7 @@ export interface OutputNormalized {
 	 */
 	pathinfo?: Pathinfo;
 	/**
-	 * The `publicPath` specifies the public URL address of the output files when referenced in a browser.
+	 * The 'publicPath' specifies the public URL address of the output files when referenced in a browser.
 	 */
 	publicPath?: PublicPath;
 	/**
@@ -2976,6 +3305,10 @@ export interface OutputNormalized {
 	 */
 	strictModuleExceptionHandling?: StrictModuleExceptionHandling;
 	/**
+	 * Use a Trusted Types policy to create urls for chunks.
+	 */
+	trustedTypes?: TrustedTypes;
+	/**
 	 * A unique name of the webpack build to avoid multiple webpack runtimes to conflict when using globals.
 	 */
 	uniqueName?: UniqueName;
@@ -2988,7 +3321,7 @@ export interface OutputNormalized {
 	 */
 	webassemblyModuleFilename?: WebassemblyModuleFilename;
 	/**
-	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
+	 * The method of loading chunks (methods included by default are 'jsonp' (web), 'import' (ESM), 'importScripts' (WebWorker), 'require' (sync node.js), 'async-node' (async node.js), but others might be added by plugins).
 	 */
 	workerChunkLoading?: ChunkLoading;
 	/**
@@ -3035,7 +3368,7 @@ export interface WebpackOptionsNormalized {
 	/**
 	 * Enables/Disables experiments (experimental features with relax SemVer compatibility).
 	 */
-	experiments: Experiments;
+	experiments: ExperimentsNormalized;
 	/**
 	 * Specify dependencies that shouldn't be resolved by webpack, but should become dependencies of the resulting bundle. The kind of the dependency depends on `output.libraryTarget`.
 	 */
@@ -3136,6 +3469,40 @@ export interface WebpackOptionsNormalized {
 	 * Options for the watcher.
 	 */
 	watchOptions: WatchOptions;
+}
+/**
+ * Enables/Disables experiments (experimental features with relax SemVer compatibility).
+ */
+export interface ExperimentsExtra {
+	/**
+	 * Build http(s): urls using a lockfile and resource content cache.
+	 */
+	buildHttp?: HttpUriAllowedUris | HttpUriOptions;
+	/**
+	 * Enable css support.
+	 */
+	css?: boolean | CssExperimentOptions;
+	/**
+	 * Compile entrypoints and import()s only when they are accessed.
+	 */
+	lazyCompilation?: boolean | LazyCompilationOptions;
+}
+/**
+ * Enables/Disables experiments (experimental features with relax SemVer compatibility).
+ */
+export interface ExperimentsNormalizedExtra {
+	/**
+	 * Build http(s): urls using a lockfile and resource content cache.
+	 */
+	buildHttp?: HttpUriOptions;
+	/**
+	 * Enable css support.
+	 */
+	css?: CssExperimentOptions;
+	/**
+	 * Compile entrypoints and import()s only when they are accessed.
+	 */
+	lazyCompilation?: LazyCompilationOptions;
 }
 /**
  * If an dependency matches exactly a property of the object, the property value is used as dependency.

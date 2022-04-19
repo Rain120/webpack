@@ -1,76 +1,76 @@
+require("./helpers/warmup-webpack");
+
 const path = require("path");
-const jestDiff = require("jest-diff").default;
+const jestDiff = require("jest-diff").diff;
 const stripAnsi = require("strip-ansi");
-const {
-	applyWebpackOptionsDefaults,
-	getNormalizedWebpackOptions
-} = require("..").config;
 
 /**
  * Escapes regular expression metacharacters
  * @param {string} str String to quote
  * @returns {string} Escaped string
  */
-const quotemeta = str => {
+const quoteMeta = str => {
 	return str.replace(/[-[\]\\/{}()*+?.^$|]/g, "\\$&");
 };
 
-describe("Defaults", () => {
-	const cwd = process.cwd();
-	const cwdRegExp = new RegExp(
-		`${quotemeta(cwd)}((?:\\\\)?(?:[a-zA-Z.\\-_]+\\\\)*)`,
-		"g"
-	);
-	const escapedCwd = JSON.stringify(cwd).slice(1, -1);
-	const escapedCwdRegExp = new RegExp(
-		`${quotemeta(escapedCwd)}((?:\\\\\\\\)?(?:[a-zA-Z.\\-_]+\\\\\\\\)*)`,
-		"g"
-	);
-	const normalize = str => {
-		if (cwd.startsWith("/")) {
-			str = str.replace(new RegExp(quotemeta(cwd), "g"), "<cwd>");
-		} else {
-			str = str.replace(cwdRegExp, (m, g) => `<cwd>${g.replace(/\\/g, "/")}`);
-			str = str.replace(
-				escapedCwdRegExp,
-				(m, g) => `<cwd>${g.replace(/\\\\/g, "/")}`
-			);
-		}
-		str = str.replace(/@@ -\d+,\d+ \+\d+,\d+ @@/g, "@@ ... @@");
-		return str;
-	};
-
-	class Diff {
-		constructor(value) {
-			this.value = value;
-		}
+const cwd = process.cwd();
+const cwdRegExp = new RegExp(
+	`${quoteMeta(cwd)}((?:\\\\)?(?:[a-zA-Z.\\-_]+\\\\)*)`,
+	"g"
+);
+const escapedCwd = JSON.stringify(cwd).slice(1, -1);
+const escapedCwdRegExp = new RegExp(
+	`${quoteMeta(escapedCwd)}((?:\\\\\\\\)?(?:[a-zA-Z.\\-_]+\\\\\\\\)*)`,
+	"g"
+);
+const normalize = str => {
+	if (cwd.startsWith("/")) {
+		str = str.replace(new RegExp(quoteMeta(cwd), "g"), "<cwd>");
+	} else {
+		str = str.replace(cwdRegExp, (m, g) => `<cwd>${g.replace(/\\/g, "/")}`);
+		str = str.replace(
+			escapedCwdRegExp,
+			(m, g) => `<cwd>${g.replace(/\\\\/g, "/")}`
+		);
 	}
+	str = str.replace(/@@ -\d+,\d+ \+\d+,\d+ @@/g, "@@ ... @@");
+	return str;
+};
 
-	expect.addSnapshotSerializer({
-		test(value) {
-			return value instanceof Diff;
-		},
-		print(received) {
-			return normalize(received.value);
-		}
-	});
+class Diff {
+	constructor(value) {
+		this.value = value;
+	}
+}
 
-	expect.addSnapshotSerializer({
-		test(value) {
-			return typeof value === "string";
-		},
-		print(received) {
-			return JSON.stringify(normalize(received));
-		}
-	});
+expect.addSnapshotSerializer({
+	test(value) {
+		return value instanceof Diff;
+	},
+	print(received) {
+		return normalize(received.value);
+	}
+});
 
-	const getDefaultConfig = config => {
-		config = getNormalizedWebpackOptions(config);
-		applyWebpackOptionsDefaults(config);
-		process.chdir(cwd);
-		return config;
-	};
+expect.addSnapshotSerializer({
+	test(value) {
+		return typeof value === "string";
+	},
+	print(received) {
+		return JSON.stringify(normalize(received));
+	}
+});
 
+const getDefaultConfig = config => {
+	const { applyWebpackOptionsDefaults, getNormalizedWebpackOptions } =
+		require("..").config;
+	config = getNormalizedWebpackOptions(config);
+	applyWebpackOptionsDefaults(config);
+	process.chdir(cwd);
+	return config;
+};
+
+describe("snapshots", () => {
 	const baseConfig = getDefaultConfig({ mode: "none" });
 
 	it("should have the correct base config", () => {
@@ -92,6 +92,13 @@ describe("Defaults", () => {
 		  },
 		  "experiments": Object {
 		    "asyncWebAssembly": false,
+		    "backCompat": true,
+		    "buildHttp": undefined,
+		    "cacheUnaffected": false,
+		    "css": undefined,
+		    "futureDefaults": false,
+		    "layers": false,
+		    "lazyCompilation": undefined,
 		    "outputModule": false,
 		    "syncWebAssembly": false,
 		    "topLevelAwait": false,
@@ -108,19 +115,13 @@ describe("Defaults", () => {
 		  },
 		  "externalsType": "var",
 		  "ignoreWarnings": undefined,
-		  "infrastructureLogging": Object {
-		    "debug": false,
-		    "level": "info",
-		  },
+		  "infrastructureLogging": Object {},
 		  "loader": Object {
 		    "target": "web",
 		  },
 		  "mode": "none",
 		  "module": Object {
 		    "defaultRules": Array [
-		      Object {
-		        "type": "javascript/auto",
-		      },
 		      Object {
 		        "mimetype": "application/node",
 		        "type": "javascript/auto",
@@ -187,7 +188,21 @@ describe("Defaults", () => {
 		      },
 		      Object {
 		        "dependency": "url",
-		        "type": "asset/resource",
+		        "oneOf": Array [
+		          Object {
+		            "scheme": /\\^data\\$/,
+		            "type": "asset/inline",
+		          },
+		          Object {
+		            "type": "asset/resource",
+		          },
+		        ],
+		      },
+		      Object {
+		        "assert": Object {
+		          "type": "json",
+		        },
+		        "type": "json",
 		      },
 		    ],
 		    "generator": Object {},
@@ -203,7 +218,8 @@ describe("Defaults", () => {
 		        "exprContextRecursive": true,
 		        "exprContextRegExp": false,
 		        "exprContextRequest": ".",
-		        "strictExportPresence": false,
+		        "importMeta": true,
+		        "strictExportPresence": undefined,
 		        "strictThisContextOnImports": false,
 		        "unknownContextCritical": true,
 		        "unknownContextRecursive": true,
@@ -276,12 +292,13 @@ describe("Defaults", () => {
 		      "minChunks": 1,
 		      "minRemainingSize": undefined,
 		      "minSize": 10000,
-		      "usedExports": true,
+		      "usedExports": false,
 		    },
 		    "usedExports": false,
 		  },
 		  "output": Object {
 		    "assetModuleFilename": "[hash][ext][query]",
+		    "asyncChunks": true,
 		    "charset": true,
 		    "chunkFilename": "[name].js",
 		    "chunkFormat": "array-push",
@@ -291,6 +308,8 @@ describe("Defaults", () => {
 		    "clean": undefined,
 		    "compareBeforeEmit": true,
 		    "crossOriginLoading": false,
+		    "cssChunkFilename": "[name].css",
+		    "cssFilename": "[name].css",
 		    "devtoolFallbackModuleFilenameTemplate": undefined,
 		    "devtoolModuleFilenameTemplate": undefined,
 		    "devtoolNamespace": "webpack",
@@ -332,6 +351,7 @@ describe("Defaults", () => {
 		    "sourceMapFilename": "[file].map[query]",
 		    "sourcePrefix": undefined,
 		    "strictModuleExceptionHandling": false,
+		    "trustedTypes": undefined,
 		    "uniqueName": "webpack",
 		    "wasmLoading": "fetch",
 		    "webassemblyModuleFilename": "[hash].module.wasm",
@@ -413,6 +433,26 @@ describe("Defaults", () => {
 		        ],
 		        "conditionNames": Array [
 		          "require",
+		          "module",
+		          "...",
+		        ],
+		        "extensions": Array [
+		          ".js",
+		          ".json",
+		          ".wasm",
+		        ],
+		        "mainFields": Array [
+		          "browser",
+		          "module",
+		          "...",
+		        ],
+		      },
+		      "loaderImport": Object {
+		        "aliasFields": Array [
+		          "browser",
+		        ],
+		        "conditionNames": Array [
+		          "import",
 		          "module",
 		          "...",
 		        ],
@@ -563,7 +603,7 @@ describe("Defaults", () => {
 		    },
 		    "immutablePaths": Array [],
 		    "managedPaths": Array [
-		      "<cwd>/node_modules",
+		      "<cwd>/node_modules/",
 		    ],
 		    "module": Object {
 		      "timestamp": true,
@@ -656,7 +696,9 @@ describe("Defaults", () => {
 		+       "maxInitialRequests": 30,
 		@@ ... @@
 		-       "minSize": 10000,
+		-       "usedExports": false,
 		+       "minSize": 20000,
+		+       "usedExports": true,
 		@@ ... @@
 		-     "usedExports": false,
 		+     "usedExports": true,
@@ -721,7 +763,9 @@ describe("Defaults", () => {
 		+       "maxInitialRequests": 30,
 		@@ ... @@
 		-       "minSize": 10000,
+		-       "usedExports": false,
 		+       "minSize": 20000,
+		+       "usedExports": true,
 		@@ ... @@
 		-     "usedExports": false,
 		+     "usedExports": true,
@@ -746,6 +790,8 @@ describe("Defaults", () => {
 		@@ ... @@
 		-   "cache": false,
 		+   "cache": Object {
+		+     "cacheUnaffected": false,
+		+     "maxGenerations": Infinity,
 		+     "type": "memory",
 		+   },
 		@@ ... @@
@@ -832,6 +878,21 @@ describe("Defaults", () => {
 		@@ ... @@
 		-   "externalsType": "var",
 		+   "externalsType": "module",
+		@@ ... @@
+		-     "chunkFilename": "[name].js",
+		+     "chunkFilename": "[name].mjs",
+		@@ ... @@
+		-       "dynamicImport": undefined,
+		+       "dynamicImport": true,
+		@@ ... @@
+		-       "module": undefined,
+		+       "module": true,
+		@@ ... @@
+		-     "filename": "[name].js",
+		+     "filename": "[name].mjs",
+		@@ ... @@
+		-     "hotUpdateChunkFilename": "[id].[fullhash].hot-update.js",
+		+     "hotUpdateChunkFilename": "[id].[fullhash].hot-update.mjs",
 		@@ ... @@
 		-     "iife": true,
 		+     "iife": false,
@@ -936,6 +997,11 @@ describe("Defaults", () => {
 		-     "chunkFilename": "[name].js",
 		+     "chunkFilename": "[id].bundle.js",
 		@@ ... @@
+		-     "cssChunkFilename": "[name].css",
+		-     "cssFilename": "[name].css",
+		+     "cssChunkFilename": "[id].bundle.css",
+		+     "cssFilename": "bundle.css",
+		@@ ... @@
 		-     "filename": "[name].js",
 		+     "filename": "bundle.js",
 	`)
@@ -948,6 +1014,11 @@ describe("Defaults", () => {
 		@@ ... @@
 		-     "chunkFilename": "[name].js",
 		+     "chunkFilename": "[id].js",
+		@@ ... @@
+		-     "cssChunkFilename": "[name].css",
+		-     "cssFilename": "[name].css",
+		+     "cssChunkFilename": "[id].css",
+		+     "cssFilename": "[id].css",
 		@@ ... @@
 		-     "filename": "[name].js",
 		+     "filename": [Function filename],
@@ -988,6 +1059,197 @@ describe("Defaults", () => {
 		-     "uniqueName": "webpack",
 		+     "uniqueName": "myLib.awesome",
 	`)
+	);
+	test(
+		"library contains [name] placeholder",
+		{
+			output: {
+				library: ["myLib", "[name]"]
+			}
+		},
+		e =>
+			e.toMatchInlineSnapshot(`
+			- Expected
+			+ Received
+
+			@@ ... @@
+			-     "chunkLoadingGlobal": "webpackChunkwebpack",
+			+     "chunkLoadingGlobal": "webpackChunkmyLib",
+			@@ ... @@
+			-     "devtoolNamespace": "webpack",
+			+     "devtoolNamespace": "myLib",
+			@@ ... @@
+			-     "enabledLibraryTypes": Array [],
+			+     "enabledLibraryTypes": Array [
+			+       "var",
+			+     ],
+			@@ ... @@
+			-     "hotUpdateGlobal": "webpackHotUpdatewebpack",
+			+     "hotUpdateGlobal": "webpackHotUpdatemyLib",
+			@@ ... @@
+			-     "library": undefined,
+			+     "library": Object {
+			+       "auxiliaryComment": undefined,
+			+       "export": undefined,
+			+       "name": Array [
+			+         "myLib",
+			+         "[name]",
+			+       ],
+			+       "type": "var",
+			+       "umdNamedDefine": undefined,
+			+     },
+			@@ ... @@
+			-     "uniqueName": "webpack",
+			+     "uniqueName": "myLib",
+		`)
+	);
+	test(
+		"library.name contains [name] placeholder",
+		{
+			output: {
+				library: {
+					name: ["my[name]Lib", "[name]", "lib"],
+					type: "var"
+				}
+			}
+		},
+		e =>
+			e.toMatchInlineSnapshot(`
+			- Expected
+			+ Received
+
+			@@ ... @@
+			-     "chunkLoadingGlobal": "webpackChunkwebpack",
+			+     "chunkLoadingGlobal": "webpackChunkmyLib_lib",
+			@@ ... @@
+			-     "devtoolNamespace": "webpack",
+			+     "devtoolNamespace": "myLib.lib",
+			@@ ... @@
+			-     "enabledLibraryTypes": Array [],
+			+     "enabledLibraryTypes": Array [
+			+       "var",
+			+     ],
+			@@ ... @@
+			-     "hotUpdateGlobal": "webpackHotUpdatewebpack",
+			+     "hotUpdateGlobal": "webpackHotUpdatemyLib_lib",
+			@@ ... @@
+			-     "library": undefined,
+			+     "library": Object {
+			+       "auxiliaryComment": undefined,
+			+       "export": undefined,
+			+       "name": Array [
+			+         "my[name]Lib",
+			+         "[name]",
+			+         "lib",
+			+       ],
+			+       "type": "var",
+			+       "umdNamedDefine": undefined,
+			+     },
+			@@ ... @@
+			-     "uniqueName": "webpack",
+			+     "uniqueName": "myLib.lib",
+		`)
+	);
+	test(
+		"library.name.root contains [name] placeholder",
+		{
+			output: {
+				library: {
+					name: {
+						root: ["[name]", "myLib"]
+					},
+					type: "var"
+				}
+			}
+		},
+		e =>
+			e.toMatchInlineSnapshot(`
+			- Expected
+			+ Received
+
+			@@ ... @@
+			-     "chunkLoadingGlobal": "webpackChunkwebpack",
+			+     "chunkLoadingGlobal": "webpackChunkmyLib",
+			@@ ... @@
+			-     "devtoolNamespace": "webpack",
+			+     "devtoolNamespace": "myLib",
+			@@ ... @@
+			-     "enabledLibraryTypes": Array [],
+			+     "enabledLibraryTypes": Array [
+			+       "var",
+			+     ],
+			@@ ... @@
+			-     "hotUpdateGlobal": "webpackHotUpdatewebpack",
+			+     "hotUpdateGlobal": "webpackHotUpdatemyLib",
+			@@ ... @@
+			-     "library": undefined,
+			+     "library": Object {
+			+       "auxiliaryComment": undefined,
+			+       "export": undefined,
+			+       "name": Object {
+			+         "root": Array [
+			+           "[name]",
+			+           "myLib",
+			+         ],
+			+       },
+			+       "type": "var",
+			+       "umdNamedDefine": undefined,
+			+     },
+			@@ ... @@
+			-     "uniqueName": "webpack",
+			+     "uniqueName": "myLib",
+		`)
+	);
+	test(
+		"library.name.root contains escaped placeholder",
+		{
+			output: {
+				library: {
+					name: {
+						root: ["[\\name\\]", "my[\\name\\]Lib[name]", "[\\name\\]"]
+					},
+					type: "var"
+				}
+			}
+		},
+		e =>
+			e.toMatchInlineSnapshot(`
+			- Expected
+			+ Received
+
+			@@ ... @@
+			-     "chunkLoadingGlobal": "webpackChunkwebpack",
+			+     "chunkLoadingGlobal": "webpackChunk_name_my_name_Lib_name_",
+			@@ ... @@
+			-     "devtoolNamespace": "webpack",
+			+     "devtoolNamespace": "[name].my[name]Lib.[name]",
+			@@ ... @@
+			-     "enabledLibraryTypes": Array [],
+			+     "enabledLibraryTypes": Array [
+			+       "var",
+			+     ],
+			@@ ... @@
+			-     "hotUpdateGlobal": "webpackHotUpdatewebpack",
+			+     "hotUpdateGlobal": "webpackHotUpdate_name_my_name_Lib_name_",
+			@@ ... @@
+			-     "library": undefined,
+			+     "library": Object {
+			+       "auxiliaryComment": undefined,
+			+       "export": undefined,
+			+       "name": Object {
+			+         "root": Array [
+			+           "[\\\\name\\\\]",
+			+           "my[\\\\name\\\\]Lib[name]",
+			+           "[\\\\name\\\\]",
+			+         ],
+			+       },
+			+       "type": "var",
+			+       "umdNamedDefine": undefined,
+			+     },
+			@@ ... @@
+			-     "uniqueName": "webpack",
+			+     "uniqueName": "[name].my[name]Lib.[name]",
+		`)
 	);
 	test("target node", { target: "node" }, e =>
 		e.toMatchInlineSnapshot(`
@@ -1037,6 +1299,13 @@ describe("Defaults", () => {
 		-     "workerWasmLoading": "fetch",
 		+     "workerChunkLoading": "require",
 		+     "workerWasmLoading": "async-node",
+		@@ ... @@
+		-         "aliasFields": Array [
+		-           "browser",
+		-         ],
+		+         "aliasFields": Array [],
+		@@ ... @@
+		-           "browser",
 		@@ ... @@
 		-         "aliasFields": Array [
 		-           "browser",
@@ -1228,6 +1497,13 @@ describe("Defaults", () => {
 		@@ ... @@
 		-           "browser",
 		@@ ... @@
+		-         "aliasFields": Array [
+		-           "browser",
+		-         ],
+		+         "aliasFields": Array [],
+		@@ ... @@
+		-           "browser",
+		@@ ... @@
 		-       "browser",
 		+       "node",
 		+       "electron",
@@ -1344,6 +1620,13 @@ describe("Defaults", () => {
 		@@ ... @@
 		-           "browser",
 		@@ ... @@
+		-         "aliasFields": Array [
+		-           "browser",
+		-         ],
+		+         "aliasFields": Array [],
+		@@ ... @@
+		-           "browser",
+		@@ ... @@
 		+       "node",
 		@@ ... @@
 		+       "electron",
@@ -1367,7 +1650,7 @@ describe("Defaults", () => {
 		+   "recordsOutputPath": "some-path",
 	`)
 	);
-	test("ecamVersion", { output: { ecmaVersion: 2020 } }, e =>
+	test("ecmaVersion", { output: { ecmaVersion: 2020 } }, e =>
 		e.toMatchInlineSnapshot(`Compared values have no visual difference.`)
 	);
 	test("single runtimeChunk", { optimization: { runtimeChunk: "single" } }, e =>
@@ -1417,6 +1700,8 @@ describe("Defaults", () => {
 		@@ ... @@
 		-   "cache": false,
 		+   "cache": Object {
+		+     "cacheUnaffected": false,
+		+     "maxGenerations": Infinity,
 		+     "type": "memory",
 		+   },
 		@@ ... @@
@@ -1438,6 +1723,7 @@ describe("Defaults", () => {
 		@@ ... @@
 		-   "cache": false,
 		+   "cache": Object {
+		+     "allowCollectingMemory": false,
 		+     "buildDependencies": Object {
 		+       "defaultWebpack": Array [
 		+         "<cwd>/lib/",
@@ -1445,10 +1731,16 @@ describe("Defaults", () => {
 		+     },
 		+     "cacheDirectory": "<cwd>/node_modules/.cache/webpack",
 		+     "cacheLocation": "<cwd>/node_modules/.cache/webpack/default-none",
+		+     "compression": false,
 		+     "hashAlgorithm": "md4",
 		+     "idleTimeout": 60000,
-		+     "idleTimeoutForInitialStore": 0,
+		+     "idleTimeoutAfterLargeChanges": 1000,
+		+     "idleTimeoutForInitialStore": 5000,
+		+     "maxAge": 5184000000,
+		+     "maxMemoryGenerations": Infinity,
+		+     "memoryCacheUnaffected": false,
 		+     "name": "default-none",
+		+     "profile": false,
 		+     "store": "pack",
 		+     "type": "filesystem",
 		+     "version": "",
@@ -1463,6 +1755,73 @@ describe("Defaults", () => {
 		-     "cache": false,
 		+     "cache": true,
 	`)
+	);
+	test(
+		"cache filesystem development",
+		{ mode: "development", cache: { type: "filesystem" } },
+		e =>
+			e.toMatchInlineSnapshot(`
+			- Expected
+			+ Received
+
+			@@ ... @@
+			-   "cache": false,
+			+   "cache": Object {
+			+     "allowCollectingMemory": true,
+			+     "buildDependencies": Object {
+			+       "defaultWebpack": Array [
+			+         "<cwd>/lib/",
+			+       ],
+			+     },
+			+     "cacheDirectory": "<cwd>/node_modules/.cache/webpack",
+			+     "cacheLocation": "<cwd>/node_modules/.cache/webpack/default-development",
+			+     "compression": false,
+			+     "hashAlgorithm": "md4",
+			+     "idleTimeout": 60000,
+			+     "idleTimeoutAfterLargeChanges": 1000,
+			+     "idleTimeoutForInitialStore": 5000,
+			+     "maxAge": 5184000000,
+			+     "maxMemoryGenerations": 5,
+			+     "memoryCacheUnaffected": false,
+			+     "name": "default-development",
+			+     "profile": false,
+			+     "store": "pack",
+			+     "type": "filesystem",
+			+     "version": "",
+			+   },
+			@@ ... @@
+			-   "devtool": false,
+			+   "devtool": "eval",
+			@@ ... @@
+			-   "mode": "none",
+			+   "mode": "development",
+			@@ ... @@
+			-     "unsafeCache": false,
+			+     "unsafeCache": [Function anonymous],
+			@@ ... @@
+			-     "chunkIds": "natural",
+			+     "chunkIds": "named",
+			@@ ... @@
+			-     "moduleIds": "natural",
+			-     "nodeEnv": false,
+			+     "moduleIds": "named",
+			+     "nodeEnv": "development",
+			@@ ... @@
+			-       "minRemainingSize": undefined,
+			+       "minRemainingSize": 0,
+			@@ ... @@
+			-     "pathinfo": false,
+			+     "pathinfo": true,
+			@@ ... @@
+			-     "cache": false,
+			+     "cache": true,
+			@@ ... @@
+			-       "production",
+			+       "development",
+			@@ ... @@
+			-     "cache": false,
+			+     "cache": true,
+		`)
 	);
 
 	test(
@@ -1517,7 +1876,7 @@ describe("Defaults", () => {
 			-       "minChunks": 1,
 			-       "minRemainingSize": undefined,
 			-       "minSize": 10000,
-			-       "usedExports": true,
+			-       "usedExports": false,
 			-     },
 			+     "splitChunks": false,
 		`)
@@ -1527,7 +1886,8 @@ describe("Defaults", () => {
 		"uniqueName",
 		{
 			output: {
-				uniqueName: "@@@Hello World!"
+				uniqueName: "@@@Hello World!",
+				trustedTypes: true
 			}
 		},
 		e =>
@@ -1545,7 +1905,11 @@ describe("Defaults", () => {
 			-     "hotUpdateGlobal": "webpackHotUpdatewebpack",
 			+     "hotUpdateGlobal": "webpackHotUpdate_Hello_World_",
 			@@ ... @@
+			-     "trustedTypes": undefined,
 			-     "uniqueName": "webpack",
+			+     "trustedTypes": Object {
+			+       "policyName": "@@@Hello_World_",
+			+     },
 			+     "uniqueName": "@@@Hello World!",
 		`)
 	);
@@ -1652,6 +2016,7 @@ describe("Defaults", () => {
 			-   "cache": false,
 			-   "context": "<cwd>",
 			+   "cache": Object {
+			+     "allowCollectingMemory": false,
 			+     "buildDependencies": Object {
 			+       "defaultWebpack": Array [
 			+         "<cwd>/lib/",
@@ -1659,10 +2024,16 @@ describe("Defaults", () => {
 			+     },
 			+     "cacheDirectory": "<cwd>/node_modules/.cache/webpack",
 			+     "cacheLocation": "<cwd>/node_modules/.cache/webpack/default-none",
+			+     "compression": false,
 			+     "hashAlgorithm": "md4",
 			+     "idleTimeout": 60000,
-			+     "idleTimeoutForInitialStore": 0,
+			+     "idleTimeoutAfterLargeChanges": 1000,
+			+     "idleTimeoutForInitialStore": 5000,
+			+     "maxAge": 5184000000,
+			+     "maxMemoryGenerations": Infinity,
+			+     "memoryCacheUnaffected": false,
 			+     "name": "default-none",
+			+     "profile": false,
 			+     "store": "pack",
 			+     "type": "filesystem",
 			+     "version": "",
@@ -1723,4 +2094,142 @@ describe("Defaults", () => {
 			+       "async-node",
 		`)
 	);
+
+	test(
+		"experiments.futureDefaults",
+		{
+			experiments: {
+				futureDefaults: true
+			}
+		},
+		e =>
+			e.toMatchInlineSnapshot(`
+			- Expected
+			+ Received
+
+			@@ ... @@
+			-     "asyncWebAssembly": false,
+			-     "backCompat": true,
+			+     "asyncWebAssembly": true,
+			+     "backCompat": false,
+			@@ ... @@
+			-     "cacheUnaffected": false,
+			-     "css": undefined,
+			-     "futureDefaults": false,
+			+     "cacheUnaffected": true,
+			+     "css": Object {
+			+       "exportsOnly": false,
+			+     },
+			+     "futureDefaults": true,
+			@@ ... @@
+			-     "topLevelAwait": false,
+			+     "topLevelAwait": true,
+			@@ ... @@
+			+       },
+			+       Object {
+			+         "rules": Array [
+			+           Object {
+			+             "descriptionData": Object {
+			+               "type": "module",
+			+             },
+			+             "resolve": Object {
+			+               "fullySpecified": true,
+			+             },
+			+           },
+			+         ],
+			+         "test": /\\.wasm$/i,
+			+         "type": "webassembly/async",
+			+       },
+			+       Object {
+			+         "mimetype": "application/wasm",
+			+         "rules": Array [
+			+           Object {
+			+             "descriptionData": Object {
+			+               "type": "module",
+			+             },
+			+             "resolve": Object {
+			+               "fullySpecified": true,
+			+             },
+			+           },
+			+         ],
+			+         "type": "webassembly/async",
+			+       },
+			+       Object {
+			+         "oneOf": Array [
+			+           Object {
+			+             "resolve": Object {
+			+               "fullySpecified": true,
+			+             },
+			+             "test": /\\.module\\.css$/i,
+			+             "type": "css/module",
+			+           },
+			+           Object {
+			+             "resolve": Object {
+			+               "fullySpecified": true,
+			+               "preferRelative": true,
+			+             },
+			+             "type": "css",
+			+           },
+			+         ],
+			+         "test": /\\.css$/i,
+			+       },
+			+       Object {
+			+         "mimetype": "text/css+module",
+			+         "resolve": Object {
+			+           "fullySpecified": true,
+			+         },
+			+         "type": "css/module",
+			+       },
+			+       Object {
+			+         "mimetype": "text/css",
+			+         "resolve": Object {
+			+           "fullySpecified": true,
+			+           "preferRelative": true,
+			+         },
+			+         "type": "css",
+			@@ ... @@
+			+         "exportsPresence": "error",
+			@@ ... @@
+			-     "__dirname": "mock",
+			-     "__filename": "mock",
+			-     "global": true,
+			+     "__dirname": "warn-mock",
+			+     "__filename": "warn-mock",
+			+     "global": "warn",
+			@@ ... @@
+			+         "css",
+			@@ ... @@
+			-     "hashDigestLength": 20,
+			-     "hashFunction": "md4",
+			+     "hashDigestLength": 16,
+			+     "hashFunction": "xxhash64",
+			@@ ... @@
+			-       "<cwd>/node_modules/",
+			+       /^(.+?[\\\\/]node_modules[\\\\/])/,
+		`)
+	);
+});
+
+it("should result in the same target options for same target", () => {
+	const inlineTarget = getDefaultConfig({ target: "node12.17" });
+	const browserslistTarget = getDefaultConfig({
+		target: "browserslist: node 12.17"
+	});
+	const diff = stripAnsi(
+		jestDiff(inlineTarget, browserslistTarget, {
+			expand: false,
+			contextLines: 0
+		})
+	);
+
+	expect(inlineTarget.output.environment.module).toBe(true);
+	expect(inlineTarget.output.environment.dynamicImport).toBe(true);
+	expect(new Diff(diff)).toMatchInlineSnapshot(`
+		- Expected
+		+ Received
+
+		@@ ... @@
+		-   "target": "node12.17",
+		+   "target": "browserslist: node 12.17",
+	`);
 });
